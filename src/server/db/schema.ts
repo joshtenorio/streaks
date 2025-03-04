@@ -49,7 +49,8 @@ export const habitTemplates = createTable(
   {
     id: int("habit_templateid", { mode: "number" }).primaryKey({ autoIncrement: true }),
     user: int("userid", { mode: "number" }),
-    habit_name: text("habit_name", { length: 256 }),
+    habit_name: text("habit_name", { length: 256 }).notNull(),
+    streak: int("streak", { mode: "number" }).default(0).notNull(),
     createdAt: int("created_at", { mode: "timestamp" })
       .default(sql`(unixepoch())`)
       .notNull(),
@@ -62,7 +63,7 @@ export const habitTemplates = createTable(
 export const checkIns = createTable(
   "checkin",
   {
-    id: int("checkin_id", { mode: "number"}).primaryKey({ autoIncrement: true }),
+    id: int("checkin_id", { mode: "number" }).primaryKey({ autoIncrement: true }),
     habit_id: int("habit_templateid", { mode: "number" }),
     createdAt: int("created_at", { mode: "timestamp" })
       .default(sql`(unixepoch())`)
