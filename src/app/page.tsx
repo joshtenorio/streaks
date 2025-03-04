@@ -15,66 +15,44 @@ import { checkIns, habitTemplates } from "@/server/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
-async function resetStreaksForInactiveHabits(): Promise<void> {
-  try {
-    const yesterdayStart = getYesterdayTimestamp().start;
-    const yesterdayEnd = getYesterdayTimestamp().end;
+async function resetStreaksIfNeeded() {
+  const currentTime = Math.floor(Date.now() / 1000); // Current time in seconds
+  const oneDayInSeconds = 86400; // 24 hours in seconds
 
-    // Find habit templates that *did not* have a check-in yesterday
-    const inactiveHabitTemplates = await db.run(sql`
-  SELECT ${habitTemplates.id}
-  FROM ${habitTemplates}
-  WHERE NOT EXISTS (
-  SELECT 1
-  FROM ${checkIns}
-  WHERE ${checkIns.habit_id} = ${habitTemplates.id}
-  AND ${checkIns.createdAt} >= ${yesterdayStart}
-  AND ${checkIns.createdAt} <= ${yesterdayEnd}
-  );
-  `);
+  // Get all habit templates
+  const habits = await db
+    .select()
+    .from(habitTemplates)
+    .execute();
 
-    // Extract the habit template IDs from the result
-    const inactiveHabitTemplateIds = (inactiveHabitTemplates as any).rows.map(
-      (row: any) => row.habit_templateid,
-    );
+  for (const habit of habits) {
+    // Get the last check-in for the current habit
+    const lastCheckIn = await db
+      .select()
+      .from(checkIns)
+      .where(sql`${checkIns.habit_id} = ${habit.id}`)
+      .orderBy(checkIns.createdAt, 'desc')
+      .limit(1)
+      .execute();
 
-    // Reset the streak for those habit templates
-    if (inactiveHabitTemplateIds.length > 0) {
+    const lastCheckInTime = lastCheckIn.length > 0 ? lastCheckIn[0]?.createdAt.getMilliseconds() : 0;
+
+    // Check if more than a day has passed since the last check-in
+    if (lastCheckInTime && (currentTime - lastCheckInTime) > oneDayInSeconds) {
+      // Reset the streak to zero
       await db
         .update(habitTemplates)
         .set({ streak: 0 })
-        .where(
-          sql`${habitTemplates.id} IN (${inactiveHabitTemplateIds.join(",")})`,
-        );
-      console.log(
-        `Reset streak for ${inactiveHabitTemplateIds.length} inactive habits.`,
-      );
-    } else {
-      console.log("No inactive habits found.");
+        .where(sql`${habitTemplates.id} = ${habit.id}`)
+        .execute();
     }
-  } catch (error) {
-    console.error("Error resetting streaks:", error);
   }
-}
-
-// Utility function to get yesterday's timestamp range
-function getYesterdayTimestamp(): { start: number; end: number } {
-  const now = new Date();
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  yesterday.setHours(0, 0, 0, 0);
-  const start = Math.floor(yesterday.getTime() / 1000); // Unix timestamp in seconds
-
-  const endOfDay = new Date(yesterday);
-  endOfDay.setHours(23, 59, 59, 999);
-  const end = Math.floor(endOfDay.getTime() / 1000); // Unix timestamp in seconds
-  return { start, end };
 }
 
 async function getHabits(uid: number) {
   "use server";
 
-  await resetStreaksForInactiveHabits();
+  await resetStreaksIfNeeded();
   const res = await db
     .select()
     .from(habitTemplates)
