@@ -28,3 +28,47 @@ export const posts = createTable(
     nameIndex: index("name_idx").on(example.name),
   })
 );
+
+export const users = createTable(
+  "user",
+  {
+    id: int("userid", { mode: "number" }).primaryKey({ autoIncrement: true }),
+    name: text("name", { length: 256 }).notNull(),
+    pass: text("pass", { length: 256 }).notNull(),
+    createdAt: int("created_at", { mode: "timestamp" })
+      .default(sql`(unixepoch())`)
+      .notNull(),
+    updatedAt: int("updated_at", { mode: "timestamp" }).$onUpdate(
+      () => new Date()
+    ),
+  }
+)
+
+export const habitTemplates = createTable(
+  "habit_template",
+  {
+    id: int("habit_templateid", { mode: "number" }).primaryKey({ autoIncrement: true }),
+    user: int("userid", { mode: "number" }),
+    habit_name: text("habit_name", { length: 256 }),
+    createdAt: int("created_at", { mode: "timestamp" })
+      .default(sql`(unixepoch())`)
+      .notNull(),
+    updatedAt: int("updated_at", { mode: "timestamp" }).$onUpdate(
+      () => new Date()
+    ),
+  }
+)
+
+export const checkIns = createTable(
+  "checkin",
+  {
+    id: int("checkin_id", { mode: "number"}).primaryKey({ autoIncrement: true }),
+    habit_id: int("habit_templateid", { mode: "number" }),
+    createdAt: int("created_at", { mode: "timestamp" })
+      .default(sql`(unixepoch())`)
+      .notNull(),
+    updatedAt: int("updated_at", { mode: "timestamp" }).$onUpdate(
+      () => new Date()
+    ),
+  }
+)
