@@ -16,8 +16,8 @@ import { desc, eq, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
 async function resetStreaksIfNeeded() {
-  const currentTime = Math.floor(Date.now() / 1000); // Current time in seconds
-  const oneDayInSeconds = 86400; // 24 hours in seconds
+  const currentTime = Date.now() + 25200000; // Current time in ms, plus 7 hours to adjust for phx time
+  const oneDayInMilliseconds = 86400000; // 24 hours in ms
 
   // Get all habit templates
   const habits = await db
@@ -35,10 +35,12 @@ async function resetStreaksIfNeeded() {
       .limit(1)
       .execute();
 
-    const lastCheckInTime = lastCheckIn.length > 0 ? lastCheckIn[0]?.createdAt.getMilliseconds() : 0;
+    const dayBounds = getStartAndEndOfDay(currentTime - oneDayInMilliseconds)
+    const lastCheckInTime = lastCheckIn.length > 0 && lastCheckIn[0] ? lastCheckIn[0].createdAt.getTime() : 0;
 
     // Check if more than a day has passed since the last check-in
-    if (lastCheckInTime && (currentTime - lastCheckInTime) > oneDayInSeconds) {
+    if( lastCheckInTime < dayBounds.start ) {
+    //if (lastCheckInTime && (currentTime - lastCheckInTime) > oneDayInMilliseconds) {
       // Reset the streak to zero
       await db
         .update(habitTemplates)
@@ -47,6 +49,24 @@ async function resetStreaksIfNeeded() {
         .execute();
     }
   }
+}
+
+function getStartAndEndOfDay(utcTimeInMillis: number): { start: number; end: number } {
+  // Create a Date object from the given UTC time
+  const date = new Date(utcTimeInMillis);
+
+  // Get the year, month, and date
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  const day = date.getUTCDate();
+
+  // Create the start of the day (00:00:00)
+  const startOfDay = new Date(Date.UTC(year, month, day, 0, 0, 0)).getTime() + 25200000;
+
+  // Create the end of the day (23:59:59)
+  const endOfDay = new Date(Date.UTC(year, month, day, 23, 59, 59, 999)).getTime() + 25200000;
+
+  return { start: startOfDay, end: endOfDay };
 }
 
 async function getHabits(uid: number) {
@@ -108,7 +128,23 @@ function HabitCard(props: HabitCardProps) {
   );
 }
 
+function formatMilliseconds(ms: number): string {
+  if (ms >= 3600000) { // Greater than or equal to 1 hour
+      const hours = Math.floor(ms / 3600000);
+      return `${hours} hour${hours !== 1 ? 's' : ''}`;
+  } else if (ms >= 60000) { // Greater than or equal to 1 minute
+      const minutes = Math.floor(ms / 60000);
+      return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+  } else if (ms >= 1000) { // Greater than or equal to 1 second
+      const seconds = Math.floor(ms / 1000);
+      return `${seconds} second${seconds !== 1 ? 's' : ''}`;
+  } else {
+      return 'less than a second';
+  }
+}
+
 export default async function HomePage() {
+  const bounds = getStartAndEndOfDay(Date.now())
   const session = await getSession();
   console.log(session);
 
@@ -122,6 +158,7 @@ export default async function HomePage() {
   return (
     <div className="flex flex-col items-center space-y-2 px-2 py-2">
       <div className="text-3xl font-semibold">Hi, {session.user}</div>
+      <div>time left to midnight: {formatMilliseconds(bounds.end - Date.now())}</div>
       <Dialog>
         <DialogTrigger asChild>
           <Button variant={"outline"} className="w-32">
