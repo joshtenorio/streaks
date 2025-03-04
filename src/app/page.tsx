@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { getSession } from "@/server/auth";
 import { db } from "@/server/db";
 import { checkIns, habitTemplates } from "@/server/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
 async function resetStreaksIfNeeded() {
@@ -31,7 +31,7 @@ async function resetStreaksIfNeeded() {
       .select()
       .from(checkIns)
       .where(sql`${checkIns.habit_id} = ${habit.id}`)
-      .orderBy(checkIns.createdAt, 'desc')
+      .orderBy(desc(checkIns.createdAt))
       .limit(1)
       .execute();
 
